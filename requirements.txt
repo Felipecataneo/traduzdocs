@@ -1,6 +1,5 @@
-streamlit==1.16.0
-pymupdf==1.20.2
-python-docx==0.8.11
-openpyxl==3.0.9
-deep-translator==1.8.1
-pywin32==305
+pymupdf
+python-docx
+openpyxl
+deep-translator
+pywin32
