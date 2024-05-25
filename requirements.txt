@@ -2,4 +2,4 @@ pymupdf
 python-docx
 openpyxl
 deep-translator
-pywin32
+
