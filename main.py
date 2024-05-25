@@ -4,10 +4,17 @@ import docx
 from docx import Document
 from deep_translator import GoogleTranslator
 import os
-import pythoncom
-import win32com.client as win32
 import tempfile
 import io
+
+try:
+    import pythoncom
+    import win32com.client as win32
+except ImportError:
+    pythoncom = None
+    win32 = None
+
+import platform
 
 # Função para extrair texto de PDFs, página por página
 def extract_text_from_pdf(pdf_path):
@@ -15,7 +22,7 @@ def extract_text_from_pdf(pdf_path):
     pages = []
     for page_num in range(doc.page_count):
         page = doc.load_page(page_num)
-        text = page.get_text("text")  # Usar o modo "text" para manter a ordem de leitura natural
+        text = page.get_text("text")
         pages.append(text)
     return pages
 
@@ -27,19 +34,29 @@ def extract_text_from_docx(docx_path):
 
 # Função para converter e extrair texto de arquivos .doc
 def extract_text_from_doc(doc_path):
-    try:
-        pythoncom.CoInitialize()
-        word = win32.Dispatch("Word.Application")
-        word.Visible = False
-        doc = word.Documents.Open(doc_path)
-        temp_docx_path = doc_path + 'x'
-        doc.SaveAs(temp_docx_path, FileFormat=16)  # 16 é o formato para .docx
-        doc.Close()
-        word.Quit()
-        return extract_text_from_docx(temp_docx_path)
-    except Exception as e:
-        st.error(f"Erro ao converter arquivo .doc: {e}")
-        return ""
+    if platform.system() == "Windows" and pythoncom and win32:
+        try:
+            pythoncom.CoInitialize()
+            word = win32.Dispatch("Word.Application")
+            word.Visible = False
+            doc = word.Documents.Open(doc_path)
+            temp_docx_path = doc_path + 'x'
+            doc.SaveAs(temp_docx_path, FileFormat=16)  # 16 é o formato para .docx
+            doc.Close()
+            word.Quit()
+            return extract_text_from_docx(temp_docx_path)
+        except Exception as e:
+            st.error(f"Erro ao converter arquivo .doc: {e}")
+            return ""
+    else:
+        try:
+            import subprocess
+            temp_docx_path = doc_path + 'x'
+            subprocess.run(['soffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', os.path.dirname(doc_path)])
+            return extract_text_from_docx(temp_docx_path)
+        except Exception as e:
+            st.error(f"Erro ao converter arquivo .doc no Linux: {e}")
+            return ""
 
 # Função para dividir o texto em partes menores
 def split_text(text, max_length=5000):
@@ -64,14 +81,14 @@ def process_documents(file_paths, lingua_destino):
             file_type = 'pdf'
         elif file_path.endswith('.docx'):
             text = extract_text_from_docx(file_path)
-            pages = [text]  # Tratar como uma única "página"
+            pages = [text]
             file_type = 'docx'
         elif file_path.endswith('.doc'):
             text = extract_text_from_doc(file_path)
-            pages = [text]  # Tratar como uma única "página"
+            pages = [text]
             file_type = 'doc'
             if text == "":
-                continue  # Skip this file if conversion failed
+                continue
         else:
             st.error(f"Formato não suportado: {file_path}")
             continue
@@ -104,7 +121,7 @@ def create_translated_docx(translated_pages, original_filename):
 def create_translated_pdf(translated_pages, original_filename):
     doc = fitz.open()
     for translated_page in translated_pages:
-        parts = split_text(translated_page, max_length=1000)  # Ajuste o tamanho conforme necessário
+        parts = split_text(translated_page, max_length=1000)
         for part in parts:
             page = doc.new_page()
             page.insert_text((72, 72), part)
@@ -134,7 +151,6 @@ if st.button("Traduzir"):
         with st.spinner('Processando e traduzindo documentos...'):
             file_paths = []
             for uploaded_file in uploaded_files:
-                # Salva os arquivos carregados em um diretório temporário
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as temp_file:
                     temp_file.write(uploaded_file.read())
                     file_paths.append((temp_file.name, uploaded_file.name))
