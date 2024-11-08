@@ -6,6 +6,7 @@ from deep_translator import GoogleTranslator
 import os
 import tempfile
 import io
+import pymupdf4llm
 
 try:
     import pythoncom
@@ -16,21 +17,16 @@ except ImportError:
 
 import platform
 
-# Função para extrair texto de PDFs, página por página
+# Função para extrair texto de PDFs no formato Markdown
 def extract_text_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
-    pages = []
-    for page_num in range(doc.page_count):
-        page = doc.load_page(page_num)
-        text = page.get_text("text")
-        pages.append(text)
-    return pages
+    md_text = pymupdf4llm.to_markdown(pdf_path)
+    return [md_text]
 
 # Função para extrair texto de arquivos .docx
 def extract_text_from_docx(docx_path):
     doc = docx.Document(docx_path)
     text = "\n".join([para.text for para in doc.paragraphs])
-    return text
+    return [text]
 
 # Função para converter e extrair texto de arquivos .doc
 def extract_text_from_doc(doc_path):
@@ -47,7 +43,7 @@ def extract_text_from_doc(doc_path):
             return extract_text_from_docx(temp_docx_path)
         except Exception as e:
             st.error(f"Erro ao converter arquivo .doc: {e}")
-            return ""
+            return [""]
     else:
         try:
             import subprocess
@@ -56,7 +52,7 @@ def extract_text_from_doc(doc_path):
             return extract_text_from_docx(temp_docx_path)
         except Exception as e:
             st.error(f"Erro ao converter arquivo .doc no Linux: {e}")
-            return ""
+            return [""]
 
 # Função para dividir o texto em partes menores
 def split_text(text, max_length=5000):
@@ -80,14 +76,12 @@ def process_documents(file_paths, lingua_destino):
             pages = extract_text_from_pdf(file_path)
             file_type = 'pdf'
         elif file_path.endswith('.docx'):
-            text = extract_text_from_docx(file_path)
-            pages = [text]
+            pages = extract_text_from_docx(file_path)
             file_type = 'docx'
         elif file_path.endswith('.doc'):
-            text = extract_text_from_doc(file_path)
-            pages = [text]
+            pages = extract_text_from_doc(file_path)
             file_type = 'doc'
-            if text == "":
+            if pages[0] == "":
                 continue
         else:
             st.error(f"Formato não suportado: {file_path}")
