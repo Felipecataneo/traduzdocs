@@ -3,4 +3,3 @@ python-docx
 openpyxl
 deep-translator
 pymupdf4llm
-libreoffice-fresh
